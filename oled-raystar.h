@@ -151,6 +151,8 @@ typedef struct _OledRaystar_Device
     char fontEndChar;
     bool useCustomFont;                        /**< Use custom font or basic */
 
+    // PRIVATE SECTION
+    bool isFirstFlush;
 
     // TODO: fixed dimensions?
     uint8_t dump [64][64];          /**< Buffer to store display modification */

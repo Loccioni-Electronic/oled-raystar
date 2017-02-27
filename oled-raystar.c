@@ -467,6 +467,8 @@ void OledRaystar_init (OledRaystar_Device* dev)
 
     dev->useCustomFont = FALSE;
 
+    dev->isFirstFlush = TRUE;
+
     // Reset sequence
     OledRaystar_sendCommand(dev,OLEDRAYSTAR_CMD_SET_ON,TRUE);
     // Wait 100ms after on
@@ -749,7 +751,7 @@ void OledRaystar_flush (OledRaystar_Device* dev)
     {
         for (uint8_t x = 0; x < (dev->columns >> 1); ++x)
         {
-            if (dev->dump[x][y] != dev->dumpOld[x][y])
+            if ((dev->dump[x][y] != dev->dumpOld[x][y]) || (dev->isFirstFlush))
             {
                 OledRaystar_setBufferPosition(dev,x,y);
                 OledRaystar_sendData(dev,dev->dump[x][y],TRUE);
@@ -757,6 +759,8 @@ void OledRaystar_flush (OledRaystar_Device* dev)
             }
         }
     }
+    // Clear first flush flag
+    dev->isFirstFlush = FALSE;
 }
 
 void OledRaystar_setFont (OledRaystar_Device* dev,
