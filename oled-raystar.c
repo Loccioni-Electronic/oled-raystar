@@ -465,6 +465,8 @@ void OledRaystar_init (OledRaystar_Device* dev)
     Gpio_set(dev->cs);
     Gpio_set(dev->rs);
 
+    dev->useCustomFont = FALSE;
+
     // Reset sequence
     OledRaystar_sendCommand(dev,OLEDRAYSTAR_CMD_SET_ON,TRUE);
     // Wait 100ms after on
@@ -540,26 +542,145 @@ OledRaystar_Errors OledRaystar_setPixel (OledRaystar_Device* dev,
     return OLEDRAYSTAR_ERRORS_OK;
 }
 
-
-void OledRaystar_putChar (OledRaystar_Device* dev,
-                          uint8_t c,
-                          uint8_t xPosition,
-                          uint8_t yPosition,
-                          OledRaystar_GrayScale grayscale)
+uint8_t OledRaystar_putChar (OledRaystar_Device* dev,
+                             uint8_t c,
+                             uint8_t xPosition,
+                             uint8_t yPosition,
+                             OledRaystar_GrayScale grayscale)
 {
-    uint8_t i = 0;
+    uint8_t i = 0, j = 0;
+    uint8_t varWidth = 0;
 
-    for (i=0; i<6; i++)
+    if (dev->useCustomFont)
     {
-        ((OledRaystar_basicFont[c][i] & 0x80) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 0,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x40) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 1,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x20) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 2,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x10) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 3,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x08) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 4,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x04) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 5,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x02) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 6,grayscale)) : (0);
-        ((OledRaystar_basicFont[c][i] & 0x01) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 7,grayscale)) : (0);
+        if (dev->fontType == OLEDRAYSTAR_FONTTYPE_MICROE)
+        {
+            // The number of bytes for each column
+            uint8_t BHeight = dev->fontHeight / 8;
+            if ((dev->fontHeight % 8) > 0) BHeight++;
+            // The number of bytes for each char
+            uint8_t BPerChar = dev->fontWidth * BHeight + 1;
+
+            // Find current position in the font table
+            const char* p;
+            p = dev->fontTable + (c - dev->fontStartChar) * BPerChar;
+            varWidth = *p; // first element of the char position
+            p++;
+
+            // Check if the dimension is acceptable
+            if (((xPosition + varWidth) > dev->columns) || ((yPosition + dev->fontHeight) > dev->rows))
+                return 0;
+
+            // Print the char
+            for (i = 0; i < varWidth; i++)
+            {
+                uint8_t pixelDrew = 0;
+                for (j = 0; j < BHeight; j++)
+                {
+                    uint8_t data = p[i * BHeight + j];
+
+                    if (pixelDrew >= dev->fontHeight)
+                        break;
+
+                    // Print each pixel
+                    uint8_t pixel;
+                    for (pixel = 0; pixel < 8; pixel++)
+                    {
+                        (data & (1<<pixel)) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + j*8 + pixel,grayscale)) : (0);
+                        // Increment pixel in the column
+                        pixelDrew++;
+                    }
+                }
+            }
+            return varWidth;
+        }
+        if (dev->fontType == OLEDRAYSTAR_FONTTYPE_OPENGLCD)
+        {
+            // The number of bytes for each column
+            uint8_t BHeight = dev->fontHeight / 8;
+            if ((dev->fontHeight % 8) > 0) BHeight++;
+
+            // Find current position in the font table
+            const char* p;
+            p = dev->fontTable + 6 + (c - dev->fontStartChar);
+            // Width element
+            varWidth = *p;
+
+            // Check if the dimension is acceptable
+            if (((xPosition + varWidth) > dev->columns) || ((yPosition + dev->fontHeight) > dev->rows))
+                return 0;
+
+            if (varWidth == 0)
+                return dev->fontWidth / 2;
+
+            // Search start byte for selected char
+            uint16_t byteCount = 0;
+            for (uint8_t i = 0; i < (c - dev->fontStartChar); i++)
+            {
+                p = dev->fontTable + 6 + i;
+                byteCount += *p;
+            }
+
+            // First byte of the char
+            // dev->fontEndChar - dev->fontStartChar = dev->fontTable[5]
+            p = dev->fontTable + 6 + (dev->fontEndChar - dev->fontStartChar + 1) + (byteCount * BHeight);
+
+            // Print the char:
+            // Before print out first 8bit of all columns, and after
+            // go down!
+            uint8_t pixelDrew = 0, maxPixelDraw = 0;
+            for (i = 0; i < BHeight; i++)
+            {
+                // compute the number of bits to print!
+                if ((dev->fontHeight - pixelDrew) > 8)
+                    maxPixelDraw = 8;
+                else
+                    maxPixelDraw = dev->fontHeight - pixelDrew;
+
+                if (pixelDrew >= dev->fontHeight)
+                    break;
+
+                // Print the char
+                for (j = 0; j < varWidth; j++)
+                {
+                    uint8_t data = p[i * varWidth + j];
+
+                    // Print each pixel
+                    uint8_t pixel;
+                    uint8_t shift = 8 - maxPixelDraw;
+                    for (pixel = 0; pixel < maxPixelDraw; pixel++)
+                    {
+                        (data & (1<< (pixel + shift))) ? (OledRaystar_setPixel(dev,xPosition + j,yPosition + i*8 + pixel,grayscale)) : (0);
+                    }
+                }
+                // Increment pixel in the column
+                pixelDrew += maxPixelDraw;
+            }
+
+            // Added blank column
+            return varWidth + 1;
+        }
+        else
+        {
+            return 0;
+        }
     }
+    else // Use basic font
+    {
+        for (i=0; i<6; i++)
+        {
+            ((OledRaystar_basicFont[c][i] & 0x80) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 0,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x40) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 1,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x20) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 2,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x10) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 3,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x08) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 4,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x04) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 5,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x02) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 6,grayscale)) : (0);
+            ((OledRaystar_basicFont[c][i] & 0x01) > 0) ? (OledRaystar_setPixel(dev,xPosition + i,yPosition + 7,grayscale)) : (0);
+            return 6;
+        }
+    }
+
 }
 
 void OledRaystar_putString (OledRaystar_Device* dev,
@@ -568,9 +689,10 @@ void OledRaystar_putString (OledRaystar_Device* dev,
                             uint8_t yPosition,
                             OledRaystar_GrayScale grayscale)
 {
+    uint8_t charWidth = 0;
     for (uint8_t i=0; string[i] != '\n' && string[i] != '\0'; i++)
     {
-        OledRaystar_putChar(dev,string[i],(xPosition + 6*i),yPosition,grayscale);
+        charWidth += OledRaystar_putChar(dev,string[i],(xPosition + charWidth),yPosition,grayscale);
     }
 }
 
@@ -635,4 +757,22 @@ void OledRaystar_flush (OledRaystar_Device* dev)
             }
         }
     }
+}
+
+void OledRaystar_setFont (OledRaystar_Device* dev,
+                          const char * fontTable,
+                          OledRaystar_FontType type,
+                          uint8_t width,
+                          uint8_t height,
+                          char startChar,
+                          char endChar)
+{
+    dev->fontTable = fontTable;
+    dev->fontType = type;
+    dev->fontWidth = width;
+    dev->fontHeight = height;
+    dev->fontStartChar = startChar;
+    dev->fontEndChar = endChar;
+
+    dev->useCustomFont = TRUE;
 }
