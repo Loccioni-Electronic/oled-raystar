@@ -32,7 +32,7 @@
  *
  * @section changelog ChangeLog
  *
- * @li v1.1 of 2017/XX/XX
+ * @li v1.1 of 2017/02/28 - Added font selection possibility
  * @li v1.0 of 2017/02/21 - First release
  *
  * @section library External Library
@@ -51,10 +51,10 @@
 #ifndef __LOCCIONI_OLEDRAYSTAR_H
 #define __LOCCIONI_OLEDRAYSTAR_H
 
-#define LOCCIONI_OLEDRAYSTAR_LIBRARY_VERSION     "1.0"
+#define LOCCIONI_OLEDRAYSTAR_LIBRARY_VERSION     "1.1"
 #define LOCCIONI_OLEDRAYSTAR_LIBRARY_VERSION_M   1
-#define LOCCIONI_OLEDRAYSTAR_LIBRARY_VERSION_m   0
-#define LOCCIONI_OLEDRAYSTAR_LIBRARY_TIME        1487671913
+#define LOCCIONI_OLEDRAYSTAR_LIBRARY_VERSION_m   1
+#define LOCCIONI_OLEDRAYSTAR_LIBRARY_TIME        1488290502
 
 #include "libohiboard.h"
 
