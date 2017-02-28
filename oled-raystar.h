@@ -290,7 +290,18 @@ OledRaystar_Errors OledRaystar_drawPicture (OledRaystar_Device* dev,
 void OledRaystar_flush (OledRaystar_Device* dev);
 
 /**
- * TODO!
+ * The function save all the informations about new font that can be used
+ * to print text. It is possible to use different type of generated font.
+ * Some font hold the size and char informations inside the data array, but
+ * it is prefered to pass these informations directly to the function.
+ *
+ * @param[in] dev The handle of the device
+ * @param[in] fontTable The array containing every char of the font
+ * @param[in] type The type of the font based on the software that generate it
+ * @param[in] width The maximum width of the char
+ * @param[in] height The maximum height of the char
+ * @param[in] startChar The first char can draw
+ * @param[in] endChar The last char can be draw
  */
 void OledRaystar_setFont (OledRaystar_Device* dev,
                           const char * fontTable,
